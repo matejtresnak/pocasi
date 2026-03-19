@@ -5,39 +5,32 @@
     <title>Počasí ve světě - Vyhledávání</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.1.3/dist/leaflet-velocity.min.css" />
     
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; overflow: hidden; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
         
-        header { 
-            background-color: #2c3e50; 
-            color: white; 
-            padding: 10px 20px; 
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
-            position: relative; 
-            z-index: 1000;
-            flex-wrap: wrap; 
-            gap: 15px;
-        }
-
-        .header-text {
-            display: flex;
-            align-items: baseline;
-            gap: 15px;
-        }
-
+        header { background-color: #2c3e50; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; z-index: 1000; flex-wrap: wrap; gap: 15px; flex-shrink: 0; }
+        .header-text { display: flex; align-items: baseline; gap: 15px; }
         h1 { margin: 0; font-size: 1.3em; white-space: nowrap; }
-        p { margin: 0; font-size: 0.9em; color: #bdc3c7; }
+        p { margin: 0; font-size: 0.9em; color: #bdc3c7; display: none; }
+        @media (min-width: 800px) { p { display: block; } }
         
-        #map { height: calc(100vh - 62px); width: 100vw; }
+        .tabs { display: flex; gap: 10px; flex-grow: 1; justify-content: center; }
+        .tab-btn { background-color: #34495e; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 5px; font-size: 1em; transition: background-color 0.3s, transform 0.1s; }
+        .tab-btn:hover { background-color: #465c73; }
+        .tab-btn:active { transform: scale(0.98); }
+        .tab-btn.active { background-color: #3498db; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        .tab-content { flex-grow: 1; position: relative; display: none; height: 100%; width: 100%; }
+        .tab-content.active { display: block; }
 
         .search-container { display: flex; align-items: center; gap: 10px; margin: 0; }
-        .search-container input { padding: 8px 15px; font-size: 1em; border: none; border-radius: 20px; width: 250px; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
-        .search-container button { padding: 8px 18px; font-size: 1em; border: none; border-radius: 20px; background-color: #3498db; color: white; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
-        .search-container button:hover { background-color: #2980b9; }
+        .search-container input { padding: 8px 15px; font-size: 1em; border: none; border-radius: 20px; width: 200px; outline: none; }
+        .search-container button { padding: 8px 18px; font-size: 1em; border: none; border-radius: 20px; background-color: #3498db; color: white; cursor: pointer; font-weight: bold; }
+        
+        #map { height: 100%; width: 100%; }
+        #map-wind { height: 100%; width: 100%; background-color: #1a1a1a; }
 
         .weather-popup { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width: 100%; }
         .weather-popup h3 { margin: 0 0 10px 0; font-size: 1.5em; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; text-align: center; }
@@ -49,28 +42,9 @@
         .chart-container { height: 250px; width: 100%; border-top: 1px solid #eee; padding-top: 15px; }
         .loading { text-align: center; font-size: 1.2em; color: #7f8c8d; padding: 30px;}
 
-        /* --- OPRAVENÉ CSS PRO OKNO VPRAVO --- */
-        
-        .right-popup .leaflet-popup-tip-container {
-            display: none !important;
-        }
-        
-        .right-popup .leaflet-popup-content-wrapper {
-            position: relative;
-        }
-
-        .right-popup .leaflet-popup-content-wrapper::before {
-            content: '';
-            position: absolute;
-            left: -12px;
-            /* ZMĚNA: Kotvíme šipku 22px odspodu. Když okno roste nahoru, šipka se nehne! */
-            bottom: 22px; 
-            border-width: 12px 12px 12px 0;
-            border-style: solid;
-            border-color: transparent white transparent transparent;
-            filter: drop-shadow(-2px 2px 2px rgba(0,0,0,0.1));
-            z-index: 10;
-        }
+        .right-popup .leaflet-popup-tip-container { display: none !important; }
+        .right-popup .leaflet-popup-content-wrapper { position: relative; }
+        .right-popup .leaflet-popup-content-wrapper::before { content: ''; position: absolute; left: -12px; bottom: 22px; border-width: 12px 12px 12px 0; border-style: solid; border-color: transparent white transparent transparent; filter: drop-shadow(-2px 2px 2px rgba(0,0,0,0.1)); z-index: 10; }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .anim-sun { display: inline-block; animation: spin 10s linear infinite; }
@@ -87,28 +61,118 @@
     <header>
         <div class="header-text">
             <h1>Počasí ve světě</h1>
-            <p>Najděte si město nebo na něj klikněte přímo na mapě.</p>
+            <p>Najděte si město nebo na něj klikněte.</p>
         </div>
         
-        <div class="search-container">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-map', this)">🗺️ Mapa počasí</button>
+            <button class="tab-btn" onclick="switchTab('tab-wind', this)">💨 Světové větry</button>
+        </div>
+
+        <div class="search-container" id="search-container">
             <input type="text" id="searchInput" list="city-datalist" placeholder="Napište název města..." autofocus>
             <datalist id="city-datalist"></datalist>
             <button onclick="searchCity()">Najít</button>
         </div>
     </header>
 
-    <div id="map"></div>
+    <div id="tab-map" class="tab-content active">
+        <div id="map"></div>
+    </div>
+
+    <div id="tab-wind" class="tab-content">
+        <div id="map-wind"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.1.3/dist/leaflet-velocity.min.js"></script>
     <script src="mesta.js"></script>
 
     <script>
+        // 1. INICIALIZACE MAP
         const map = L.map('map').setView([20.0, 0.0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        const mapWind = L.map('map-wind').setView([20.0, 0.0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(mapWind);
+
+        let windDataLoaded = false;
+
+        // 2. GENERÁTOR LOKÁLNÍCH TESTOVACÍCH DAT
+        // Místo stahování si prohlížeč vytvoří vlastní "umělý" vítr, který krásně proudí.
+        function generateLocalWindData() {
+            const nx = 36; // Rozlišení na délku
+            const ny = 19; // Rozlišení na šířku
+            const totalPoints = nx * ny;
+            
+            // Generujeme umělé plynulé proudění (vítr směřující k severovýchodu s lehkou vlnou)
+            const uData = Array.from({length: totalPoints}, (_, i) => 8 + Math.sin(i / 10) * 5);
+            const vData = Array.from({length: totalPoints}, (_, i) => 3 + Math.cos(i / 15) * 4);
+
+            return [
+                {
+                    header: { parameterCategory: 2, parameterNumber: 2, lo1: 0, la1: 90, dx: 10, dy: 10, nx: nx, ny: ny, refTime: "2024-01-01" },
+                    data: uData
+                },
+                {
+                    header: { parameterCategory: 2, parameterNumber: 3, lo1: 0, la1: 90, dx: 10, dy: 10, nx: nx, ny: ny, refTime: "2024-01-01" },
+                    data: vData
+                }
+            ];
+        }
+
+        function switchTab(tabId, clickedBtn) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            clickedBtn.classList.add('active');
+
+            const searchContainer = document.getElementById('search-container');
+            
+            if (tabId === 'tab-map') {
+                searchContainer.style.display = 'flex';
+                setTimeout(() => { map.invalidateSize(); }, 10);
+            } else if (tabId === 'tab-wind') {
+                searchContainer.style.display = 'none';
+                setTimeout(() => { mapWind.invalidateSize(); }, 10);
+                
+                if (!windDataLoaded) {
+                    loadWindData();
+                }
+            }
+        }
+
+        // 3. VYKRESLENÍ LOKÁLNÍCH DAT BEZ INTERNETU
+        function loadWindData() {
+            windDataLoaded = true;
+
+            const localData = generateLocalWindData();
+
+            const velocityLayer = L.velocityLayer({
+                displayValues: true,
+                displayOptions: {
+                    velocityType: 'Testovací lokální vítr',
+                    displayPosition: 'bottomleft',
+                    displayEmptyString: 'Žádná data',
+                    angleConvention: 'bearingCW'
+                },
+                data: localData, // Použijeme naše lokálně vygenerovaná data
+                maxVelocity: 15,
+                colorScale: [
+                    "rgb(36,104, 180)", "rgb(60,157, 194)", "rgb(128,205,193)",
+                    "rgb(151,218,168)", "rgb(198,231,181)", "rgb(238,247,217)",
+                    "rgb(255,238,159)", "rgb(252,217,125)", "rgb(255,182,100)",
+                    "rgb(252,150,75)", "rgb(250,112,52)", "rgb(245,64,32)",
+                    "rgb(227,26,28)", "rgb(189,0,38)", "rgb(128,0,38)"
+                ]
+            });
+
+            velocityLayer.addTo(mapWind);
+        }
+
+        // --- PŮVODNÍ FUNKCE POČASÍ ---
 
         const markersObj = {};
 
@@ -124,16 +188,7 @@
 
         function createCityMarker(lat, lon, cityName, countryName) {
             const marker = L.marker([lat, lon]).addTo(map);
-            
-            // ZMĚNA: Nastavili jsme stejný min a max width (420px), aby se okno neroztahovalo do šířky,
-            // a upřesnili jsme offset [x, y], aby přesně pasoval na tělo ikonky.
-            marker.bindPopup("", { 
-                minWidth: 420, 
-                maxWidth: 420, 
-                className: 'right-popup', 
-                offset: [235, 30] 
-            });
-            
+            marker.bindPopup("", { minWidth: 420, maxWidth: 420, className: 'right-popup', offset: [235, 30] });
             markersObj[cityName.toLowerCase()] = { marker: marker, lat: lat, lon: lon };
 
             marker.on('popupopen', async function() {
@@ -141,7 +196,6 @@
                 
                 try {
                     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,surface_pressure,weathercode&daily=temperature_2m_max&past_days=30&forecast_days=1&timezone=auto`;
-                    
                     const weatherResponse = await fetch(weatherUrl);
                     if (!weatherResponse.ok) throw new Error("Nelze načíst počasí");
                     const weatherData = await weatherResponse.json();
@@ -149,34 +203,25 @@
                     const current = weatherData.current;
                     const daily = weatherData.daily;
                     const appearance = getWeatherAppearance(current.weathercode);
-
-                    const dateLabels = daily.time.map(dateString => {
-                        const d = new Date(dateString);
-                        return `${d.getDate()}. ${d.getMonth() + 1}.`;
-                    });
-
+                    const dateLabels = daily.time.map(d => `${new Date(d).getDate()}. ${new Date(d).getMonth() + 1}.`);
                     const safeName = String(cityName).replace(/[^a-zA-Z0-9]/g, '');
                     const chartId = `chart-${safeName}-${Date.now()}`;
                     
-                    const popupHTML = `
+                    marker.setPopupContent(`
                         <div class="weather-popup">
                             <h3>${cityName} (${countryName})</h3>
                             <div class="temp-container">
-                                <div class="weather-icon ${appearance.class}" title="Kód počasí: ${current.weathercode}">${appearance.emoji}</div>
+                                <div class="weather-icon ${appearance.class}">${appearance.emoji}</div>
                                 <div class="main-temp">${current.temperature_2m} °C</div>
                             </div>
                             <div class="details">
                                 <div class="detail-item" title="Rychlost větru">💨 <b>${current.wind_speed_10m} km/h</b></div>
                                 <div class="detail-item" title="Relativní vlhkost">💧 <b>${current.relative_humidity_2m} %</b></div>
-                                <div class="detail-item" title="Atmosférický tlak" style="grid-column: span 2;">⏲️ <b>${current.surface_pressure} hPa</b></div>
+                                <div class="detail-item" style="grid-column: span 2;">⏲️ <b>${current.surface_pressure} hPa</b></div>
                             </div>
-                            <div class="chart-container">
-                                <canvas id="${chartId}"></canvas>
-                            </div>
+                            <div class="chart-container"><canvas id="${chartId}"></canvas></div>
                         </div>
-                    `;
-                    
-                    marker.setPopupContent(popupHTML);
+                    `);
 
                     setTimeout(() => {
                         const ctx = document.getElementById(chartId);
@@ -185,43 +230,23 @@
                                 type: 'line',
                                 data: {
                                     labels: dateLabels,
-                                    datasets: [{
-                                        label: 'Max. teplota (°C)',
-                                        data: daily.temperature_2m_max,
-                                        borderColor: '#3498db',
-                                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                                        borderWidth: 2,
-                                        pointRadius: 2,
-                                        fill: true,
-                                        tension: 0.3
-                                    }]
+                                    datasets: [{ label: 'Max. teplota (°C)', data: daily.temperature_2m_max, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)', borderWidth: 2, pointRadius: 2, fill: true, tension: 0.3 }]
                                 },
-                                options: {
-                                    responsive: true, maintainAspectRatio: false,
-                                    plugins: { legend: { display: false }, title: { display: true, text: 'Vývoj max. teplot za posledních 30 dní', font: { size: 14 } } },
-                                    scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { ticks: { font: { size: 12 } } } }
-                                }
+                                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Vývoj max. teplot za posledních 30 dní' } }, scales: { x: { ticks: { maxTicksLimit: 6 } } } }
                             });
                         }
                     }, 50);
 
                 } catch (error) {
-                    marker.setPopupContent(`
-                        <div class="weather-popup">
-                            <h3>${cityName}</h3>
-                            <span style="color: red;">Chyba připojení k Open-Meteo.</span>
-                        </div>
-                    `);
+                    marker.setPopupContent(`<div class="weather-popup"><h3>${cityName}</h3><span style="color: red;">Chyba připojení k Open-Meteo.</span></div>`);
                 }
             });
         }
 
         const datalist = document.getElementById('city-datalist');
-
         if (typeof worldCapitals !== 'undefined') {
             worldCapitals.forEach(cityData => {
                 createCityMarker(cityData.lat, cityData.lon, cityData.city, cityData.country);
-                
                 const option = document.createElement('option');
                 option.value = cityData.city;
                 datalist.appendChild(option);
@@ -230,30 +255,18 @@
 
         function searchCity() {
             const inputVal = document.getElementById('searchInput').value.trim().toLowerCase();
-            
             if (markersObj[inputVal]) {
                 const cityTarget = markersObj[inputVal];
-                
-                map.flyTo([cityTarget.lat, cityTarget.lon], 6, {
-                    animate: true,
-                    duration: 1.5 
-                });
-                
-                map.once('moveend', function() {
-                    cityTarget.marker.openPopup();
-                });
+                map.flyTo([cityTarget.lat, cityTarget.lon], 6, { animate: true, duration: 1.5 });
+                map.once('moveend', () => cityTarget.marker.openPopup());
             } else {
-                alert("Město '" + document.getElementById('searchInput').value + "' nebylo nalezeno. Zkontrolujte překlepy.");
+                alert("Město '" + document.getElementById('searchInput').value + "' nebylo nalezeno.");
             }
         }
         
-        document.getElementById('searchInput').addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                searchCity();
-            }
+        document.getElementById('searchInput').addEventListener("keypress", event => {
+            if (event.key === "Enter") { event.preventDefault(); searchCity(); }
         });
-
     </script>
 </body>
 </html>
